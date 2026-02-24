@@ -11,36 +11,36 @@ pytestmark = pytest.mark.unit
 
 
 def _setup_devices(mock: MockOscClient, track_index: int = 0) -> None:
-    """Responses do NOT include track_index prefix."""
-    mock.when_get("/live/track/get/num_devices", 2)
-    mock.when_get("/live/track/get/devices/name", "Operator", "Auto Filter")
-    mock.when_get("/live/track/get/devices/type", 1, 0)  # instrument, audio_effect
-    mock.when_get("/live/track/get/devices/class_name", "Operator", "AutoFilter")
+    """Track-level: (track_index, value/values...)."""
+    mock.when_get("/live/track/get/num_devices", track_index, 2)
+    mock.when_get("/live/track/get/devices/name", track_index, "Operator", "Auto Filter")
+    mock.when_get("/live/track/get/devices/type", track_index, 1, 0)  # instrument, audio_effect
+    mock.when_get("/live/track/get/devices/class_name", track_index, "Operator", "AutoFilter")
 
 
 def _setup_device_params(mock: MockOscClient, track: int = 0, device: int = 0) -> None:
-    """Responses do NOT include track/device index prefix."""
-    mock.when_get("/live/device/get/name", "Operator")
-    mock.when_get("/live/device/get/num_parameters", 3)
+    """Device-level: (track_index, device_index, value/values...)."""
+    mock.when_get("/live/device/get/name", track, device, "Operator")
+    mock.when_get("/live/device/get/num_parameters", track, device, 3)
     mock.when_get(
         "/live/device/get/parameters/name",
-        "Device On", "Osc A Waveform", "Filter Freq"
+        track, device, "Device On", "Osc A Waveform", "Filter Freq"
     )
     mock.when_get(
         "/live/device/get/parameters/value",
-        1.0, 0.0, 0.5
+        track, device, 1.0, 0.0, 0.5
     )
     mock.when_get(
         "/live/device/get/parameters/min",
-        0.0, 0.0, 0.0
+        track, device, 0.0, 0.0, 0.0
     )
     mock.when_get(
         "/live/device/get/parameters/max",
-        1.0, 4.0, 1.0
+        track, device, 1.0, 4.0, 1.0
     )
     mock.when_get(
         "/live/device/get/parameters/is_quantized",
-        1, 1, 0
+        track, device, 1, 1, 0
     )
 
 
@@ -69,10 +69,10 @@ async def test_get_devices_returns_list(mock_client: MockOscClient):
 
 
 async def test_get_devices_empty_track(mock_client: MockOscClient):
-    mock_client.when_get("/live/track/get/num_devices", 0)
-    mock_client.when_get("/live/track/get/devices/name")
-    mock_client.when_get("/live/track/get/devices/type")
-    mock_client.when_get("/live/track/get/devices/class_name")
+    mock_client.when_get("/live/track/get/num_devices", 0, 0)
+    mock_client.when_get("/live/track/get/devices/name", 0)
+    mock_client.when_get("/live/track/get/devices/type", 0)
+    mock_client.when_get("/live/track/get/devices/class_name", 0)
     result = await device_tools.get_devices(mock_client, 0)
     assert result["count"] == 0
     assert result["devices"] == []
@@ -110,8 +110,9 @@ async def test_get_device_parameters_returns_all(mock_client: MockOscClient):
 
 
 async def test_get_device_parameter_single(mock_client: MockOscClient):
-    mock_client.when_get("/live/device/get/parameter/value", 0.75)
-    mock_client.when_get("/live/device/get/parameter/value_string", "0.75 kHz")
+    # Response: (track_index, device_index, param_index, value)
+    mock_client.when_get("/live/device/get/parameter/value", 0, 0, 2, 0.75)
+    mock_client.when_get("/live/device/get/parameter/value_string", 0, 0, 2, "0.75 kHz")
 
     result = await device_tools.get_device_parameter(mock_client, 0, 0, 2)
     assert result["value"] == 0.75
@@ -119,8 +120,8 @@ async def test_get_device_parameter_single(mock_client: MockOscClient):
 
 
 async def test_get_device_parameter_includes_indices(mock_client: MockOscClient):
-    mock_client.when_get("/live/device/get/parameter/value", 0.5)
-    mock_client.when_get("/live/device/get/parameter/value_string", "50%")
+    mock_client.when_get("/live/device/get/parameter/value", 1, 2, 5, 0.5)
+    mock_client.when_get("/live/device/get/parameter/value_string", 1, 2, 5, "50%")
     result = await device_tools.get_device_parameter(mock_client, 1, 2, 5)
     assert result["track_index"] == 1
     assert result["device_index"] == 2

@@ -34,9 +34,10 @@ async def test_get_scenes_empty(mock_client: MockOscClient):
 
 
 async def test_get_scene_single(mock_client: MockOscClient):
-    mock_client.when_get("/live/scene/get/name", "Intro")
-    mock_client.when_get("/live/scene/get/tempo", 120.0)
-    mock_client.when_get("/live/scene/get/tempo_enabled", 0)
+    # Scene-level: (scene_index, value)
+    mock_client.when_get("/live/scene/get/name", 0, "Intro")
+    mock_client.when_get("/live/scene/get/tempo", 0, 120.0)
+    mock_client.when_get("/live/scene/get/tempo_enabled", 0, 0)
 
     result = await scene_tools.get_scene(mock_client, 0)
     assert result["name"] == "Intro"

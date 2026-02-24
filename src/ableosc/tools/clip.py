@@ -213,18 +213,24 @@ async def duplicate_clip_loop(
 # ---------------------------------------------------------------------------
 
 def _scalar(args: tuple[Any, ...]) -> Any:
-    """Extract the first value from an OSC response tuple."""
-    return args[0] if args else None
+    """Extract the value from a clip-level OSC response.
+
+    AbletonOSC prefixes clip-level responses with track_index and clip_index:
+        (track_index, clip_index, value)
+    The value is always the last element.
+    """
+    return args[-1] if args else None
 
 
 def _parse_notes(args: tuple[Any, ...]) -> list[NoteDict]:
     """Parse a flat OSC note sequence into a list of note dicts.
 
-    AbletonOSC encodes notes as a flat sequence:
-        pitch start_time duration velocity mute  [repeated]
+    AbletonOSC prefixes the response with (track_index, clip_index) then
+    encodes notes as a flat sequence:
+        track_index clip_index pitch start_time duration velocity mute  [repeated]
     """
     notes: list[NoteDict] = []
-    flat = list(args)
+    flat = list(args[2:])  # skip track_index and clip_index
     for i in range(0, len(flat) - 4, 5):
         notes.append(
             {

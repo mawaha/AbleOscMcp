@@ -20,12 +20,16 @@ async def get_devices(client: "OscClient", track_index: int) -> dict[str, Any]:
         client.get("/live/track/get/devices/class_name", track_index),
     )
     count = _scalar(num_result)
+    # Track-level list responses: (track_index, val1, val2, ...) — skip first element
+    name_list = names[1:]
+    type_list = types[1:]
+    class_list = class_names[1:]
     devices = [
         {
             "index": i,
-            "name": names[i] if i < len(names) else "?",
-            "type": _DEVICE_TYPES.get(types[i] if i < len(types) else -1, "unknown"),
-            "class_name": class_names[i] if i < len(class_names) else "?",
+            "name": name_list[i] if i < len(name_list) else "?",
+            "type": _DEVICE_TYPES.get(type_list[i] if i < len(type_list) else -1, "unknown"),
+            "class_name": class_list[i] if i < len(class_list) else "?",
         }
         for i in range(count)
     ]
@@ -55,14 +59,20 @@ async def get_device_parameters(
     )
 
     count = _scalar(num_params)
+    # Device-level list responses: (track_index, device_index, val1, val2, ...) — skip first two
+    names_list = param_names[2:]
+    values_list = param_values[2:]
+    mins_list = param_mins[2:]
+    maxs_list = param_maxs[2:]
+    quantized_list = param_quantized[2:]
     params = [
         {
             "index": i,
-            "name": param_names[i] if i < len(param_names) else "?",
-            "value": param_values[i] if i < len(param_values) else None,
-            "min": param_mins[i] if i < len(param_mins) else None,
-            "max": param_maxs[i] if i < len(param_maxs) else None,
-            "is_quantized": bool(param_quantized[i]) if i < len(param_quantized) else False,
+            "name": names_list[i] if i < len(names_list) else "?",
+            "value": values_list[i] if i < len(values_list) else None,
+            "min": mins_list[i] if i < len(mins_list) else None,
+            "max": maxs_list[i] if i < len(maxs_list) else None,
+            "is_quantized": bool(quantized_list[i]) if i < len(quantized_list) else False,
         }
         for i in range(count)
     ]
@@ -132,4 +142,9 @@ async def set_device_parameter(
 # ---------------------------------------------------------------------------
 
 def _scalar(args: tuple[Any, ...]) -> Any:
-    return args[0] if args else None
+    """Extract the value from a device-level OSC response.
+
+    AbletonOSC prefixes device-level responses with track_index and device_index
+    (and sometimes param_index). The value is always the last element.
+    """
+    return args[-1] if args else None

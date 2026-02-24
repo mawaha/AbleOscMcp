@@ -93,4 +93,10 @@ async def fire_selected_scene(client: "OscClient") -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 def _scalar(args: tuple[Any, ...]) -> Any:
-    return args[0] if args else None
+    """Extract the value from a scene-level OSC response.
+
+    AbletonOSC prefixes scene-level responses with scene_index:
+        (scene_index, value)
+    The value is always the last element.
+    """
+    return args[-1] if args else None

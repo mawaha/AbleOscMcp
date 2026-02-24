@@ -13,19 +13,20 @@ pytestmark = pytest.mark.unit
 def _setup_track(mock: MockOscClient, track_index: int = 0) -> None:
     """Pre-load realistic responses for a single track.
 
-    Responses do NOT include the track_index prefix — AbletonOSC returns
-    just the value(s). This assumption will be validated via integration tests.
+    Track-level responses include track_index as first element:
+        (track_index, value)  for scalars
+        (track_index, val1, val2, ...)  for lists
     """
-    mock.when_get("/live/track/get/name", "Drums")
-    mock.when_get("/live/track/get/volume", 0.85)
-    mock.when_get("/live/track/get/panning", 0.0)
-    mock.when_get("/live/track/get/mute", 0)
-    mock.when_get("/live/track/get/solo", 0)
-    mock.when_get("/live/track/get/arm", 1)
-    mock.when_get("/live/track/get/can_be_armed", 1)
-    mock.when_get("/live/track/get/num_devices", 1)
-    mock.when_get("/live/track/get/devices/name", "Drum Rack")
-    mock.when_get("/live/track/get/clips/name", "Beat Loop", None, None, None)
+    mock.when_get("/live/track/get/name", track_index, "Drums")
+    mock.when_get("/live/track/get/volume", track_index, 0.85)
+    mock.when_get("/live/track/get/panning", track_index, 0.0)
+    mock.when_get("/live/track/get/mute", track_index, 0)
+    mock.when_get("/live/track/get/solo", track_index, 0)
+    mock.when_get("/live/track/get/arm", track_index, 1)
+    mock.when_get("/live/track/get/can_be_armed", track_index, 1)
+    mock.when_get("/live/track/get/num_devices", track_index, 1)
+    mock.when_get("/live/track/get/devices/name", track_index, "Drum Rack")
+    mock.when_get("/live/track/get/clips/name", track_index, "Beat Loop", None, None, None)
 
 
 # ---------------------------------------------------------------------------
@@ -87,19 +88,14 @@ async def test_get_track_filters_empty_clip_slots(mock_client: MockOscClient):
 
 
 def test_scalar_single_value():
-    """_scalar should return args[0] for a 1-tuple."""
+    """_scalar returns the last element (song-level, no prefix)."""
     assert track_tools._scalar((120.0,)) == 120.0
 
 
-def test_scalar_returns_first_element():
-    """_scalar always returns args[0] — the simple, no-index-skipping version.
-
-    If AbletonOSC turns out to prepend track_index to responses, we'll add
-    index-aware parsing here once confirmed via integration tests.
-    """
-    assert track_tools._scalar((0.85,)) == 0.85
-    # For a 2-tuple, returns the first element (no special-casing)
-    assert track_tools._scalar((0, 0.85)) == 0
+def test_scalar_track_prefixed():
+    """_scalar skips track_index prefix and returns the value."""
+    assert track_tools._scalar((0, 0.85)) == 0.85
+    assert track_tools._scalar((3, "Drums")) == "Drums"
 
 
 def test_scalar_empty():

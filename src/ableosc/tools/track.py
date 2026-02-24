@@ -48,9 +48,13 @@ async def get_track(client: "OscClient", track_index: int) -> dict[str, Any]:
         client.get("/live/track/get/clips/name", track_index),
     )
 
+    # Track-level list responses: (track_index, val1, val2, ...) — skip first element
+    device_list = list(device_names[1:])
+    clip_list = list(clip_names[1:])
+
     clips = [
         {"slot_index": i, "name": n}
-        for i, n in enumerate(clip_names)
+        for i, n in enumerate(clip_list)
         if n is not None
     ]
 
@@ -63,7 +67,7 @@ async def get_track(client: "OscClient", track_index: int) -> dict[str, Any]:
         "solo": bool(_scalar(solo)),
         "arm": bool(_scalar(arm)),
         "can_be_armed": bool(_scalar(can_be_armed)),
-        "devices": list(device_names),
+        "devices": device_list,
         "num_devices": _scalar(num_devices),
         "clips": clips,
     }
@@ -172,10 +176,10 @@ async def duplicate_track(client: "OscClient", track_index: int) -> dict[str, An
 # ---------------------------------------------------------------------------
 
 def _scalar(args: tuple[Any, ...]) -> Any:
-    """Extract the first value from an OSC response tuple.
+    """Extract the value from a track-level OSC response.
 
-    AbletonOSC returns scalar values as 1-tuples, e.g. (120.0,) for tempo.
-    If AbletonOSC ever returns index-prepended responses we'll add handling
-    here once confirmed via integration tests.
+    AbletonOSC prefixes track-level responses with track_index:
+        (track_index, value)
+    The value is always the last element.
     """
-    return args[0] if args else None
+    return args[-1] if args else None

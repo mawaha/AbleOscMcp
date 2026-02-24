@@ -12,14 +12,14 @@ pytestmark = pytest.mark.unit
 
 
 def _setup_clip(mock: MockOscClient, track: int = 0, slot: int = 0) -> None:
-    """Responses do NOT include track/clip index prefix."""
-    mock.when_get("/live/clip/get/name", "My Clip")
-    mock.when_get("/live/clip/get/length", 4.0)
-    mock.when_get("/live/clip/get/looping", 1)
-    mock.when_get("/live/clip/get/loop_start", 0.0)
-    mock.when_get("/live/clip/get/loop_end", 4.0)
-    mock.when_get("/live/clip/get/is_playing", 0)
-    mock.when_get("/live/clip/get/color", 0xFF0000)
+    """Clip-level responses include (track_index, clip_index, value) prefix."""
+    mock.when_get("/live/clip/get/name", track, slot, "My Clip")
+    mock.when_get("/live/clip/get/length", track, slot, 4.0)
+    mock.when_get("/live/clip/get/looping", track, slot, 1)
+    mock.when_get("/live/clip/get/loop_start", track, slot, 0.0)
+    mock.when_get("/live/clip/get/loop_end", track, slot, 4.0)
+    mock.when_get("/live/clip/get/is_playing", track, slot, 0)
+    mock.when_get("/live/clip/get/color", track, slot, 0xFF0000)
 
 
 # ---------------------------------------------------------------------------
@@ -28,17 +28,18 @@ def _setup_clip(mock: MockOscClient, track: int = 0, slot: int = 0) -> None:
 
 
 def test_parse_notes_empty():
-    assert _parse_notes(()) == []
+    # (track_index, clip_index) with no notes
+    assert _parse_notes((0, 0)) == []
 
 
 def test_parse_notes_single():
-    # pitch=60, start=0.0, dur=0.25, vel=100, mute=0
-    result = _parse_notes((60, 0.0, 0.25, 100, 0))
+    # (track_index, clip_index, pitch, start, dur, vel, mute)
+    result = _parse_notes((0, 0, 60, 0.0, 0.25, 100, 0))
     assert result == [{"pitch": 60, "start_time": 0.0, "duration": 0.25, "velocity": 100, "mute": 0}]
 
 
 def test_parse_notes_multiple():
-    result = _parse_notes((60, 0.0, 0.25, 100, 0, 64, 0.5, 0.25, 90, 0))
+    result = _parse_notes((0, 0, 60, 0.0, 0.25, 100, 0, 64, 0.5, 0.25, 90, 0))
     assert len(result) == 2
     assert result[0]["pitch"] == 60
     assert result[1]["pitch"] == 64
@@ -47,8 +48,8 @@ def test_parse_notes_multiple():
 
 def test_parse_notes_incomplete_trailing_ignored():
     """If the flat list isn't divisible by 5, trailing partial note is ignored."""
-    # 7 values — 1 complete note + 2 orphan args
-    result = _parse_notes((60, 0.0, 0.25, 100, 0, 64, 0.5))
+    # (track_index, clip_index) + 1 complete note + 2 orphan args
+    result = _parse_notes((0, 0, 60, 0.0, 0.25, 100, 0, 64, 0.5))
     assert len(result) == 1
 
 
@@ -59,8 +60,8 @@ def test_flatten_notes_roundtrip():
     ]
     flat = _flatten_notes(notes)
     assert flat == [60, 0.0, 0.5, 100, 0, 62, 0.5, 0.5, 80, 0]
-    # Round-trip
-    parsed = _parse_notes(tuple(flat))
+    # Round-trip (prepend track/clip indices as AbletonOSC would)
+    parsed = _parse_notes((0, 0, *flat))
     assert parsed == notes
 
 
@@ -164,7 +165,7 @@ async def test_set_clip_loop_without_points_does_not_send_them(mock_client: Mock
 
 
 async def test_get_notes_empty_clip(mock_client: MockOscClient):
-    mock_client.when_get("/live/clip/get/notes")  # no args = empty
+    mock_client.when_get("/live/clip/get/notes", 0, 0)  # prefix only, no notes
     result = await clip_tools.get_notes(mock_client, 0, 0)
     assert result["notes"] == []
     assert result["count"] == 0
@@ -173,7 +174,8 @@ async def test_get_notes_empty_clip(mock_client: MockOscClient):
 async def test_get_notes_with_data(mock_client: MockOscClient):
     mock_client.when_get(
         "/live/clip/get/notes",
-        # 3 notes: C4, E4, G4 — a C major chord held for 1 beat (no index prefix)
+        # (track_index, clip_index, then 3 notes: C4, E4, G4)
+        0, 0,
         60, 0.0, 1.0, 100, 0,
         64, 0.0, 1.0, 90, 0,
         67, 0.0, 1.0, 85, 0,

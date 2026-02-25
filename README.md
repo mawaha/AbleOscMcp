@@ -192,7 +192,7 @@ unsubscribe("sub_3607efaa")
 ## Development
 
 ```bash
-git clone https://github.com/yourusername/AbleOscMcp
+git clone https://github.com/mawaha/AbleOscMcp
 cd AbleOscMcp
 uv sync --all-extras
 

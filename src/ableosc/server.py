@@ -25,6 +25,7 @@ from typing import Any, AsyncIterator
 
 from mcp.server.fastmcp import FastMCP
 
+from ableosc import resources
 from ableosc.client import OscClient
 from ableosc.device_database import DeviceDatabase
 from ableosc.subscriptions import SubscriptionRegistry
@@ -66,10 +67,20 @@ def create_server(client: OscClient) -> FastMCP:
     @mcp.resource("session://state")
     async def session_state() -> str:
         """Live snapshot of the current Ableton session."""
-        info = await song_tools.get_session_info(client)
-        tracks = await track_tools.get_tracks(client)
-        info["tracks"] = tracks["tracks"]
-        return json.dumps(info, indent=2)
+        data = await resources.session_state(client)
+        return json.dumps(data, indent=2)
+
+    @mcp.resource("session://tracks")
+    async def session_tracks_resource() -> str:
+        """Full detail for all tracks: name, volume, pan, mute, solo, arm, devices, clips."""
+        data = await resources.session_tracks(client)
+        return json.dumps(data, indent=2)
+
+    @mcp.resource("session://device/{track_index}/{device_index}")
+    async def session_device_resource(track_index: int, device_index: int) -> str:
+        """All parameters for a device: name, value, min, max, display string."""
+        data = await resources.device_resource(client, track_index, device_index)
+        return json.dumps(data, indent=2)
 
     # ------------------------------------------------------------------
     # Song tools

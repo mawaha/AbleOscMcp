@@ -36,6 +36,7 @@ from ableosc.tools import listen as listen_tools
 from ableosc.tools import music as music_tools
 from ableosc.tools import scene as scene_tools
 from ableosc.tools import song as song_tools
+from ableosc.tools import rack as rack_tools
 from ableosc.tools import track as track_tools
 from ableosc.tools import view as view_tools
 
@@ -47,7 +48,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def create_server(client: OscClient) -> FastMCP:
+def create_server(client: OscClient, rack_client: OscClient | None = None) -> FastMCP:
     """Create and configure the FastMCP server with all tools registered.
 
     Args:
@@ -710,6 +711,60 @@ def create_server(client: OscClient) -> FastMCP:
         """List all active subscriptions and their queued event counts."""
         return await listen_tools.list_subscriptions(registry)
 
+    # ------------------------------------------------------------------
+    # Rack chain traversal tools (requires AbleOscRack Remote Script)
+    # ------------------------------------------------------------------
+
+    if rack_client is not None:
+
+        @mcp.tool()
+        async def get_rack_chains(track_index: int, device_index: int) -> dict[str, Any]:
+            """List the chains inside a rack device (Instrument Rack, Audio Effect Rack,
+            Drum Rack). Requires AbleOscRack Remote Script installed in Ableton Live."""
+            return await rack_tools.get_rack_chains(rack_client, track_index, device_index)
+
+        @mcp.tool()
+        async def get_chain_devices(
+            track_index: int, device_index: int, chain_index: int
+        ) -> dict[str, Any]:
+            """List the devices inside a rack chain, including their class names and
+            whether any are themselves racks (can_have_chains)."""
+            return await rack_tools.get_chain_devices(
+                rack_client, track_index, device_index, chain_index
+            )
+
+        @mcp.tool()
+        async def get_chain_device_parameters(
+            track_index: int,
+            device_index: int,
+            chain_index: int,
+            nested_device_index: int,
+        ) -> dict[str, Any]:
+            """Get all parameters for a device inside a rack chain: name, value, min, max."""
+            return await rack_tools.get_chain_device_parameters(
+                rack_client, track_index, device_index, chain_index, nested_device_index
+            )
+
+        @mcp.tool()
+        async def set_chain_device_parameter(
+            track_index: int,
+            device_index: int,
+            chain_index: int,
+            nested_device_index: int,
+            param_index: int,
+            value: float,
+        ) -> dict[str, Any]:
+            """Set a parameter on a device inside a rack chain."""
+            return await rack_tools.set_chain_device_parameter(
+                rack_client,
+                track_index,
+                device_index,
+                chain_index,
+                nested_device_index,
+                param_index,
+                value,
+            )
+
     return mcp
 
 
@@ -723,10 +778,15 @@ def main() -> None:
     host = os.getenv("ABLEOSC_HOST", "127.0.0.1")
     send_port = int(os.getenv("ABLEOSC_SEND_PORT", "11000"))
     receive_port = int(os.getenv("ABLEOSC_RECEIVE_PORT", "11001"))
+    rack_send_port = int(os.getenv("ABLEOSC_RACK_SEND_PORT", "11002"))
+    rack_receive_port = int(os.getenv("ABLEOSC_RACK_RECEIVE_PORT", "11003"))
 
     async def run() -> None:
         client = OscClient(host=host, send_port=send_port, receive_port=receive_port)
         await client.start()
+
+        rack_client = OscClient(host=host, send_port=rack_send_port, receive_port=rack_receive_port)
+        await rack_client.start()
 
         try:
             alive = await client.ping()
@@ -738,10 +798,24 @@ def main() -> None:
                     "Is Ableton Live running with the AbletonOSC Remote Script active?"
                 )
 
-            mcp = create_server(client)
+            rack_alive = await rack_client.ping()
+            if rack_alive:
+                logger.info("Connected to AbleOscRack — rack chain tools enabled")
+            else:
+                logger.warning(
+                    "AbleOscRack did not respond to ping. "
+                    "Rack chain tools will not be available. "
+                    "Install the AbleOscRack Remote Script to enable them."
+                )
+                await rack_client.stop()
+                rack_client = None
+
+            mcp = create_server(client, rack_client)
             await mcp.run_stdio_async()
         finally:
             await client.stop()
+            if rack_client is not None:
+                await rack_client.stop()
 
     asyncio.run(run())
 

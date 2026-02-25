@@ -26,10 +26,13 @@ from typing import Any, AsyncIterator
 from mcp.server.fastmcp import FastMCP
 
 from ableosc.client import OscClient
+from ableosc.device_database import DeviceDatabase
 from ableosc.subscriptions import SubscriptionRegistry
 from ableosc.tools import clip as clip_tools
 from ableosc.tools import device as device_tools
+from ableosc.tools import device_db as device_db_tools
 from ableosc.tools import listen as listen_tools
+from ableosc.tools import music as music_tools
 from ableosc.tools import scene as scene_tools
 from ableosc.tools import song as song_tools
 from ableosc.tools import track as track_tools
@@ -54,6 +57,7 @@ def create_server(client: OscClient) -> FastMCP:
     """
     mcp = FastMCP("AbleOscMcp")
     registry = SubscriptionRegistry()
+    db = DeviceDatabase()
 
     # ------------------------------------------------------------------
     # Resources — expose live session state as queryable data
@@ -452,6 +456,150 @@ def create_server(client: OscClient) -> FastMCP:
     async def set_selected_device(track_index: int, device_index: int) -> dict[str, Any]:
         """Select a device in Live's UI."""
         return await view_tools.set_selected_device(client, track_index, device_index)
+
+    # ------------------------------------------------------------------
+    # Musical intelligence tools
+    # ------------------------------------------------------------------
+
+    @mcp.tool()
+    async def generate_chord(
+        root: str,
+        quality: str = "major",
+        octave: int = 4,
+        voicing: str = "close",
+    ) -> dict[str, Any]:
+        """Generate MIDI pitches for a chord.
+
+        root: Note name e.g. "C", "F#", "Bb"
+        quality: Chord quality e.g. "major", "minor", "m7", "maj7", "dim7", "7", "sus4"
+        octave: Octave for the root. 4 = middle octave (C4 = MIDI 60)
+        voicing: "close" (default) or "open" (spread across two octaves)
+
+        Returns pitches list, note names, and chord metadata.
+        """
+        return await music_tools.generate_chord(root, quality, octave, voicing)
+
+    @mcp.tool()
+    async def add_notes_in_scale(
+        track_index: int,
+        clip_index: int,
+        notes: list[dict[str, Any]],
+        scale_root: str,
+        scale_name: str,
+    ) -> dict[str, Any]:
+        """Add MIDI notes to a clip, snapping each pitch to the nearest scale tone first.
+
+        Prevents out-of-scale notes — useful when generating melodies or harmonies.
+
+        scale_root: Root note e.g. "C", "F#", "Bb"
+        scale_name: e.g. "major", "minor", "dorian", "pentatonic_minor", "blues"
+
+        Each note: {"pitch": 60, "start_time": 0.0, "duration": 0.25, "velocity": 100, "mute": 0}
+        """
+        return await music_tools.add_notes_in_scale(
+            client, track_index, clip_index, notes, scale_root, scale_name
+        )
+
+    @mcp.tool()
+    async def transpose_clip(
+        track_index: int,
+        clip_index: int,
+        semitones: int,
+    ) -> dict[str, Any]:
+        """Transpose all notes in a clip by a number of semitones.
+
+        Positive = up, negative = down. Notes shifted out of MIDI range (0–127) are dropped.
+        """
+        return await music_tools.transpose_clip(client, track_index, clip_index, semitones)
+
+    @mcp.tool()
+    async def quantize_clip(
+        track_index: int,
+        clip_index: int,
+        grid: float = 0.25,
+        amount: float = 1.0,
+    ) -> dict[str, Any]:
+        """Snap note start times in a clip to a rhythmic grid.
+
+        grid: Grid size in beats. 0.25 = 1/16 note, 0.5 = 1/8, 1.0 = 1/4 (quarter note)
+        amount: Quantize strength 0.0–1.0 (default 1.0 = full snap, 0.5 = halfway)
+        """
+        return await music_tools.quantize_clip(client, track_index, clip_index, grid, amount)
+
+    @mcp.tool()
+    async def humanize_clip(
+        track_index: int,
+        clip_index: int,
+        timing_amount: float = 0.02,
+        velocity_amount: int = 10,
+    ) -> dict[str, Any]:
+        """Add subtle random timing and velocity variation to notes in a clip.
+
+        Makes programmed patterns feel more human and less mechanical.
+
+        timing_amount: Max timing offset in beats (default 0.02 ≈ 5ms at 120BPM)
+        velocity_amount: Max velocity offset ± (default 10)
+        """
+        return await music_tools.humanize_clip(
+            client, track_index, clip_index, timing_amount, velocity_amount
+        )
+
+    # ------------------------------------------------------------------
+    # Device parameter database tools
+    # ------------------------------------------------------------------
+
+    @mcp.tool()
+    async def catalog_device(
+        track_index: int,
+        device_index: int,
+    ) -> dict[str, Any]:
+        """Scan a device's parameters and save them to the local database.
+
+        Run this once per device to enable lookup_parameter and set_device_parameter_by_name.
+        The database persists at ~/.ableosc/device_db.json between sessions.
+        """
+        return await device_db_tools.catalog_device(client, db, track_index, device_index)
+
+    @mcp.tool()
+    async def list_known_devices() -> dict[str, Any]:
+        """List all devices currently in the local parameter database."""
+        return await device_db_tools.list_known_devices(db)
+
+    @mcp.tool()
+    async def lookup_parameter(
+        device_name: str,
+        param_name: str,
+    ) -> dict[str, Any]:
+        """Search for a device parameter by name using fuzzy matching.
+
+        Requires the device to have been catalogued with catalog_device first.
+        Returns all matching parameters sorted by match quality (exact → contains).
+
+        device_name: e.g. "Operator", "Wavetable", "Auto Filter"
+        param_name: Full or partial parameter name e.g. "filter cutoff", "cutoff", "attack"
+        """
+        return await device_db_tools.lookup_parameter(db, device_name, param_name)
+
+    @mcp.tool()
+    async def set_device_parameter_by_name(
+        track_index: int,
+        device_index: int,
+        device_name: str,
+        param_name: str,
+        value: float,
+    ) -> dict[str, Any]:
+        """Look up a parameter by name and set it in one step.
+
+        Combines lookup_parameter + set_device_parameter.
+        Requires the device to have been catalogued with catalog_device first.
+
+        device_name: e.g. "Operator", "Wavetable"
+        param_name: Full or partial parameter name e.g. "filter cutoff"
+        value: Value to set (checked against min/max in the database entry)
+        """
+        return await device_db_tools.set_device_parameter_by_name(
+            client, db, track_index, device_index, device_name, param_name, value
+        )
 
     # ------------------------------------------------------------------
     # Listener tools

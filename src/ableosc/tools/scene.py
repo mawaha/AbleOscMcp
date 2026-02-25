@@ -47,7 +47,7 @@ async def fire_scene(client: "OscClient", scene_index: int) -> dict[str, Any]:
 
 async def create_scene(client: "OscClient") -> dict[str, str]:
     """Create a new empty scene at the end of the session."""
-    client.send("/live/song/create_scene")
+    client.send("/live/song/create_scene", -1)
     return {"status": "ok"}
 
 

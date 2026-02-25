@@ -55,7 +55,7 @@ async def test_fire_scene(mock_client: MockOscClient):
 async def test_create_scene(mock_client: MockOscClient):
     result = await scene_tools.create_scene(mock_client)
     assert result["status"] == "ok"
-    mock_client.assert_sent("/live/song/create_scene")
+    mock_client.assert_sent("/live/song/create_scene", (-1,))
 
 
 async def test_delete_scene(mock_client: MockOscClient):

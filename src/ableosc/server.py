@@ -581,6 +581,43 @@ def create_server(client: OscClient) -> FastMCP:
         return await device_db_tools.lookup_parameter(db, device_name, param_name)
 
     @mcp.tool()
+    async def annotate_parameter(
+        device_name: str,
+        param_name: str,
+        info_title: str,
+        info_text: str,
+    ) -> dict[str, Any]:
+        """Add or update the Info View title and description for a device parameter.
+
+        Use this to store the text shown in Ableton's Info View panel alongside
+        the parameter in the local database. Hover over a control in Ableton,
+        read what the Info View says, then call this to persist it.
+
+        device_name: Device name as catalogued e.g. "Operator"
+        param_name: Parameter name (exact or partial) e.g. "Filter Freq"
+        info_title: Info View title e.g. "Filter Frequency"
+        info_text: Info View body text e.g. "This defines the center or cutoff frequency..."
+        """
+        return await device_db_tools.annotate_parameter(
+            db, device_name, param_name, info_title, info_text
+        )
+
+    @mcp.tool()
+    async def read_info_view() -> dict[str, Any]:
+        """Read the current Info View title and text from Ableton Live's UI.
+
+        Uses the macOS Accessibility API to capture whatever text Ableton is
+        currently showing in its Info View panel (bottom-left of the screen).
+
+        Hover over any control in Ableton first, then call this tool to capture
+        its description. Combine with annotate_parameter to store it in the database.
+
+        Requires Accessibility access: System Settings → Privacy & Security → Accessibility
+        → enable Terminal (or whichever app is running the MCP server).
+        """
+        return await device_db_tools.read_info_view()
+
+    @mcp.tool()
     async def set_device_parameter_by_name(
         track_index: int,
         device_index: int,

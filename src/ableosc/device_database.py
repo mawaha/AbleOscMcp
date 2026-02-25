@@ -25,6 +25,8 @@ class ParameterEntry:
     min: float
     max: float
     display: str
+    info_title: str = ""   # Info View title e.g. "Filter Frequency"
+    info_text: str = ""    # Info View description e.g. "This defines the center or cutoff frequency..."
 
 
 @dataclass
@@ -63,7 +65,19 @@ class DeviceDatabase:
         try:
             raw = json.loads(self._path.read_text())
             for name, entry in raw.get("devices", {}).items():
-                params = [ParameterEntry(**p) for p in entry["parameters"]]
+                params = [
+                    ParameterEntry(
+                        index=p["index"],
+                        name=p["name"],
+                        value=p["value"],
+                        min=p["min"],
+                        max=p["max"],
+                        display=p.get("display", ""),
+                        info_title=p.get("info_title", ""),
+                        info_text=p.get("info_text", ""),
+                    )
+                    for p in entry["parameters"]
+                ]
                 self._data[name] = DeviceEntry(
                     name=entry["name"],
                     cataloged_at=entry["cataloged_at"],
@@ -102,6 +116,8 @@ class DeviceDatabase:
                 min=float(p.get("min", 0)),
                 max=float(p.get("max", 1)),
                 display=str(p.get("display", "")),
+                info_title=str(p.get("info_title", "")),
+                info_text=str(p.get("info_text", "")),
             )
             for p in parameters
         ]
@@ -183,7 +199,32 @@ class DeviceDatabase:
                 "min": p.min,
                 "max": p.max,
                 "display": p.display,
+                "info_title": p.info_title,
+                "info_text": p.info_text,
                 "match_quality": ["exact", "starts_with", "contains", "words"][score],
             }
             for score, p in results
         ]
+
+    def annotate_parameter(
+        self,
+        device_name: str,
+        param_index: int,
+        info_title: str,
+        info_text: str,
+    ) -> bool:
+        """
+        Add or update the Info View title and description for a parameter.
+
+        Returns True if the parameter was found and updated, False otherwise.
+        """
+        entry = self.get_device(device_name)
+        if entry is None:
+            return False
+        for p in entry.parameters:
+            if p.index == param_index:
+                p.info_title = info_title
+                p.info_text = info_text
+                self._save()
+                return True
+        return False

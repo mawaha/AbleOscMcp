@@ -1,5 +1,5 @@
 """
-Device parameter database tools: catalog, lookup, list, and set-by-name.
+Device parameter database tools: catalog, lookup, list, set-by-name, and annotation.
 """
 
 from __future__ import annotations
@@ -74,6 +74,78 @@ async def lookup_parameter(
         "matches": matches,
         "count": len(matches),
     }
+
+
+async def annotate_parameter(
+    db: DeviceDatabase,
+    device_name: str,
+    param_name: str,
+    info_title: str,
+    info_text: str,
+) -> dict:
+    """
+    Add or update the Info View title and description for a parameter.
+
+    Use this to manually store the text shown in Ableton's Info View panel,
+    which provides human-readable descriptions of what each parameter does.
+
+    Args:
+        device_name: Device name as catalogued (e.g. "Operator")
+        param_name: Parameter name to annotate (exact or partial match)
+        info_title: Info View title e.g. "Filter Frequency"
+        info_text: Info View description e.g. "This defines the center or cutoff frequency..."
+
+    Returns:
+        dict with the annotated parameter details.
+    """
+    matches = db.lookup_parameter(device_name, param_name)
+    if not matches:
+        raise ValueError(
+            f"No parameter matching {param_name!r} found in {device_name!r}."
+        )
+    best = matches[0]
+    success = db.annotate_parameter(device_name, best["index"], info_title, info_text)
+    return {
+        "device_name": device_name,
+        "param_name": best["name"],
+        "param_index": best["index"],
+        "info_title": info_title,
+        "info_text": info_text,
+        "saved": success,
+    }
+
+
+async def read_info_view() -> dict:
+    """
+    Read the current Info View title and text from Ableton Live's UI.
+
+    Uses the macOS Accessibility API to capture whatever text Ableton is
+    currently showing in the Info View panel. Hover over any control in
+    Ableton before calling this, then immediately call this tool.
+
+    Requires:
+        - macOS only
+        - Terminal (or the server process) must have Accessibility access:
+          System Settings → Privacy & Security → Accessibility
+
+    Returns:
+        dict with title and text fields, or a status message if unavailable.
+    """
+    from ableosc import info_view
+    if not info_view.is_available():
+        return {
+            "status": "unavailable",
+            "reason": "macOS Accessibility API not available. Install pyobjc or check platform.",
+        }
+    try:
+        result = info_view.read_info_view()
+        if result is None:
+            return {"status": "not_found", "reason": "Could not locate Info View in Ableton's UI"}
+        return {"status": "ok", "title": result["title"], "text": result["text"]}
+    except ImportError as e:
+        return {"status": "unavailable", "reason": str(e)}
+    except RuntimeError as e:
+        return {"status": "error", "reason": str(e)}
 
 
 async def set_device_parameter_by_name(

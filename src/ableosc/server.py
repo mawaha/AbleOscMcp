@@ -26,8 +26,10 @@ from typing import Any, AsyncIterator
 from mcp.server.fastmcp import FastMCP
 
 from ableosc.client import OscClient
+from ableosc.subscriptions import SubscriptionRegistry
 from ableosc.tools import clip as clip_tools
 from ableosc.tools import device as device_tools
+from ableosc.tools import listen as listen_tools
 from ableosc.tools import scene as scene_tools
 from ableosc.tools import song as song_tools
 from ableosc.tools import track as track_tools
@@ -51,6 +53,7 @@ def create_server(client: OscClient) -> FastMCP:
         Configured FastMCP instance ready to run.
     """
     mcp = FastMCP("AbleOscMcp")
+    registry = SubscriptionRegistry()
 
     # ------------------------------------------------------------------
     # Resources — expose live session state as queryable data
@@ -449,6 +452,67 @@ def create_server(client: OscClient) -> FastMCP:
     async def set_selected_device(track_index: int, device_index: int) -> dict[str, Any]:
         """Select a device in Live's UI."""
         return await view_tools.set_selected_device(client, track_index, device_index)
+
+    # ------------------------------------------------------------------
+    # Listener tools
+    # ------------------------------------------------------------------
+
+    @mcp.tool()
+    async def subscribe(
+        prop: str,
+        level: str = "song",
+        track_index: int | None = None,
+        clip_index: int | None = None,
+        scene_index: int | None = None,
+        device_index: int | None = None,
+    ) -> dict[str, Any]:
+        """Start listening to a Live property. Returns a sub_id immediately.
+        AbletonOSC sends the current value on subscribe, so poll() will have
+        at least one event right away.
+
+        level: "song" | "track" | "clip" | "clip_slot" | "scene" | "device" | "view"
+
+        Index args required per level:
+            track      → track_index
+            scene      → scene_index
+            clip/slot  → track_index + clip_index
+            device     → track_index + device_index
+            song/view  → none
+
+        Example properties:
+            song:   tempo, is_playing, loop, groove_amount
+            track:  mute, solo, arm, volume, panning, output_meter_level
+            clip:   is_playing, is_recording, playing_position
+            view:   selected_track, selected_scene
+        """
+        return await listen_tools.subscribe(
+            client, registry, prop, level,
+            track_index, clip_index, scene_index, device_index,
+        )
+
+    @mcp.tool()
+    async def poll(
+        sub_id: str,
+        timeout_seconds: float = 5.0,
+        max_events: int = 20,
+    ) -> dict[str, Any]:
+        """Collect events from a subscription.
+
+        Drains the event queue. If empty, blocks up to timeout_seconds waiting
+        for the next change. Returns empty events list (not an error) on timeout.
+        Each event: {"value": <new_value>}
+        """
+        return await listen_tools.poll(registry, sub_id, timeout_seconds, max_events)
+
+    @mcp.tool()
+    async def unsubscribe(sub_id: str) -> dict[str, Any]:
+        """Stop a listener and clean up its subscription."""
+        return await listen_tools.unsubscribe(client, registry, sub_id)
+
+    @mcp.tool()
+    async def list_subscriptions() -> dict[str, Any]:
+        """List all active subscriptions and their queued event counts."""
+        return await listen_tools.list_subscriptions(registry)
 
     return mcp
 

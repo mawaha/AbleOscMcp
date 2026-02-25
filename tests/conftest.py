@@ -59,6 +59,8 @@ class MockOscClient:
         self.gets: list[tuple[str, tuple[Any, ...]]] = []
         # All send() calls: list of (address, args)
         self.sends: list[tuple[str, tuple[Any, ...]]] = []
+        # Real-time listeners: address -> list of callbacks
+        self._listeners: dict[str, list] = defaultdict(list)
 
     def when_get(self, address: str, *response_args: Any) -> None:
         """Register a canned response for a GET request address."""
@@ -93,10 +95,18 @@ class MockOscClient:
         return True
 
     def add_listener(self, address: str, callback: Any) -> None:
-        pass
+        self._listeners[address].append(callback)
 
     def remove_listener(self, address: str, callback: Any) -> None:
-        pass
+        try:
+            self._listeners[address].remove(callback)
+        except ValueError:
+            pass
+
+    def simulate_event(self, address: str, *args: Any) -> None:
+        """Fire all listeners registered on address, as if AbletonOSC sent an update."""
+        for cb in list(self._listeners.get(address, [])):
+            cb(address, *args)
 
     # -- Convenience assertion helpers --
 

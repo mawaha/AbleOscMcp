@@ -33,6 +33,8 @@ Issues = "https://github.com/mawaha/AbleOscMcp/issues"
 [project.optional-dependencies]
 macos = [
     "pyobjc-framework-applicationservices>=12.1",
+    "pyobjc-framework-vision>=12.1",
+    "pyobjc-framework-quartz>=12.1",
 ]
 dev = [
     "pytest>=8.0",

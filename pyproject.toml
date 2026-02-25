@@ -2,11 +2,33 @@
 name = "ableosc-mcp"
 version = "0.1.0"
 description = "MCP server for Ableton Live via AbletonOSC"
+readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.11"
+authors = [
+    { name = "Matthew" },
+]
+keywords = ["ableton", "live", "osc", "mcp", "midi", "music", "daw"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "mcp[cli]>=1.3.0",
     "python-osc>=1.9.3",
 ]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/AbleOscMcp"
+Repository = "https://github.com/yourusername/AbleOscMcp"
+Issues = "https://github.com/yourusername/AbleOscMcp/issues"
 
 [project.optional-dependencies]
 dev = [

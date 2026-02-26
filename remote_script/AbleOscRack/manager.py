@@ -75,6 +75,7 @@ class Manager(ControlSurface):
         with self.component_guard():
             self.handlers = [
                 ableoscrack.RackHandler(self),
+                ableoscrack.BrowserHandler(self),
             ]
 
     def clear_api(self):
@@ -91,6 +92,7 @@ class Manager(ControlSurface):
             importlib.reload(ableoscrack.osc_server)
             importlib.reload(ableoscrack.handler)
             importlib.reload(ableoscrack.rack)
+            importlib.reload(ableoscrack.browser)
             importlib.reload(ableoscrack)
         except Exception:
             logging.warning(traceback.format_exc())

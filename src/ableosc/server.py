@@ -36,6 +36,7 @@ from ableosc.tools import listen as listen_tools
 from ableosc.tools import music as music_tools
 from ableosc.tools import scene as scene_tools
 from ableosc.tools import song as song_tools
+from ableosc.tools import browser_tools
 from ableosc.tools import rack as rack_tools
 from ableosc.tools import track as track_tools
 from ableosc.tools import view as view_tools
@@ -763,6 +764,53 @@ def create_server(client: OscClient, rack_client: OscClient | None = None) -> Fa
                 nested_device_index,
                 param_index,
                 value,
+            )
+
+        # ------------------------------------------------------------------
+        # Browser tools (requires AbleOscRack Remote Script)
+        # ------------------------------------------------------------------
+
+        @mcp.tool()
+        async def list_browser_categories() -> dict[str, Any]:
+            """List the available Ableton browser category names.
+
+            Categories include: instruments, audio_effects, midi_effects,
+            plugins, sounds, drums, user_library.
+
+            Requires AbleOscRack Remote Script installed in Ableton Live."""
+            return await browser_tools.list_browser_categories(rack_client)
+
+        @mcp.tool()
+        async def list_browser_devices(category_name: str) -> dict[str, Any]:
+            """List the loadable devices in a browser category.
+
+            category_name: e.g. "instruments", "audio_effects", "midi_effects"
+
+            Returns the top-level device names shown in that category.
+            Use load_device to add one to a track.
+
+            Requires AbleOscRack Remote Script installed in Ableton Live."""
+            return await browser_tools.list_browser_devices(rack_client, category_name)
+
+        @mcp.tool()
+        async def load_device(
+            track_index: int, category_name: str, device_name: str
+        ) -> dict[str, Any]:
+            """Search for a device by name and load it onto a track.
+
+            Selects the track as the hotswap target then calls browser.load_item().
+            Supports partial name matching — e.g. "Analog" matches "Analog".
+
+            track_index: 0-based track index
+            category_name: e.g. "instruments", "audio_effects", "midi_effects"
+            device_name: Full or partial device name e.g. "Analog", "Auto Filter"
+
+            Returns {"loaded": True, "name": <matched_name>} on success, or
+            {"loaded": False} if the device was not found.
+
+            Requires AbleOscRack Remote Script installed in Ableton Live."""
+            return await browser_tools.load_device(
+                rack_client, track_index, category_name, device_name
             )
 
     return mcp

@@ -13,6 +13,7 @@ pytestmark = pytest.mark.unit
 
 def _setup_clip(mock: MockOscClient, track: int = 0, slot: int = 0) -> None:
     """Clip-level responses include (track_index, clip_index, value) prefix."""
+    mock.when_get("/live/clip_slot/get/has_clip", track, slot, 1)
     mock.when_get("/live/clip/get/name", track, slot, "My Clip")
     mock.when_get("/live/clip/get/length", track, slot, 4.0)
     mock.when_get("/live/clip/get/looping", track, slot, 1)
@@ -85,12 +86,56 @@ async def test_get_clip_info(mock_client: MockOscClient):
     _setup_clip(mock_client)
     result = await clip_tools.get_clip_info(mock_client, 0, 0)
 
+    assert result["has_clip"] is True
     assert result["name"] == "My Clip"
     assert result["length_beats"] == 4.0
     assert result["looping"] is True
     assert result["loop_start_beats"] == 0.0
     assert result["loop_end_beats"] == 4.0
     assert result["is_playing"] is False
+
+
+async def test_get_clip_info_empty_slot(mock_client: MockOscClient):
+    """Empty slots should return has_clip=False without raising."""
+    mock_client.when_get("/live/clip_slot/get/has_clip", 0, 0, 0)
+    result = await clip_tools.get_clip_info(mock_client, 0, 0)
+    assert result["has_clip"] is False
+    assert result["track_index"] == 0
+    assert result["clip_index"] == 0
+    assert "name" not in result
+
+
+async def test_has_clip_true(mock_client: MockOscClient):
+    mock_client.when_get("/live/clip_slot/get/has_clip", 0, 0, 1)
+    assert await clip_tools.has_clip(mock_client, 0, 0) is True
+
+
+async def test_has_clip_false(mock_client: MockOscClient):
+    mock_client.when_get("/live/clip_slot/get/has_clip", 0, 2, 0)
+    assert await clip_tools.has_clip(mock_client, 0, 2) is False
+
+
+async def test_get_clip_slots(mock_client: MockOscClient):
+    mock_client.when_get("/live/song/get/num_scenes", 4)
+    # All slots empty except slot 1
+    mock_client.when_get("/live/clip_slot/get/has_clip", 0, 0, 0)
+    # (mock returns same response for all indices — last registered wins)
+    mock_client.when_get("/live/clip_slot/get/has_clip", 0, 1, 1)
+    result = await clip_tools.get_clip_slots(mock_client, 0)
+    assert result["track_index"] == 0
+    assert result["count"] == 4
+    assert len(result["slots"]) == 4
+    assert all("slot_index" in s and "has_clip" in s for s in result["slots"])
+
+
+async def test_get_clip_slots_sends_correct_track(mock_client: MockOscClient):
+    mock_client.when_get("/live/song/get/num_scenes", 2)
+    mock_client.when_get("/live/clip_slot/get/has_clip", 1, 0, 0)
+    await clip_tools.get_clip_slots(mock_client, 1)
+    assert any(
+        addr == "/live/clip_slot/get/has_clip" and args[0] == 1
+        for addr, args in mock_client.gets
+    )
 
 
 # ---------------------------------------------------------------------------

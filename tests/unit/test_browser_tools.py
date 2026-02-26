@@ -135,3 +135,42 @@ async def test_load_device_partial_name_match():
     result = await browser_tools.load_device(mock, 1, "audio_effects", "filter")
     assert result["loaded"] is True
     assert result["name"] == "Auto Filter"
+
+
+# ---------------------------------------------------------------------------
+# list_presets
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_list_presets_returns_preset_names():
+    mock = MockOscClient()
+    mock.when_get(
+        "/live/browser/get/presets",
+        "Mellow Bass.adv",
+        "Big Pad.adv",
+        "Bright Sync.adv",
+    )
+    result = await browser_tools.list_presets(mock, "instruments", "Analog")
+    assert result["category"] == "instruments"
+    assert result["device"] == "Analog"
+    assert result["presets"] == ["Mellow Bass.adv", "Big Pad.adv", "Bright Sync.adv"]
+
+
+@pytest.mark.asyncio
+async def test_list_presets_sends_correct_params():
+    mock = MockOscClient()
+    mock.when_get("/live/browser/get/presets", "Fat Bass.adv")
+    await browser_tools.list_presets(mock, "instruments", "Wavetable")
+    assert any(
+        addr == "/live/browser/get/presets" and args == ("instruments", "Wavetable")
+        for addr, args in mock.gets
+    )
+
+
+@pytest.mark.asyncio
+async def test_list_presets_empty():
+    mock = MockOscClient()
+    mock.when_get("/live/browser/get/presets")  # no presets
+    result = await browser_tools.list_presets(mock, "instruments", "UnknownDevice")
+    assert result["presets"] == []

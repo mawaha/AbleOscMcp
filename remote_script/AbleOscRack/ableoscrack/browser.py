@@ -177,3 +177,57 @@ class BrowserHandler(AbletonOSCHandler):
             return (1, item.name)
 
         self.osc_server.add_handler("/live/browser/load", browser_load)
+
+        # ----------------------------------------------------------------
+        # /live/browser/get/presets (category_name, device_name)
+        # Returns loadable preset names inside a named device's folder.
+        # ----------------------------------------------------------------
+
+        def browser_get_presets(params: Tuple[Any] = ()):
+            """Collect presets that live inside a device's folder subtree."""
+            category_name = str(params[0]) if len(params) > 0 else "instruments"
+            device_name = str(params[1]) if len(params) > 1 else ""
+
+            browser = _browser()
+            filter_type = _FILTER_TYPES.get(category_name)
+            if filter_type is not None:
+                browser.filter_type = filter_type
+            category = _get_category(browser, category_name)
+            if category is None:
+                return ()
+
+            device_lower = device_name.lower()
+            results = []
+
+            def walk(item, in_device_subtree=False, depth=0):
+                try:
+                    is_folder = item.is_folder
+                except Exception:
+                    is_folder = False
+                try:
+                    loadable = item.is_loadable
+                except Exception:
+                    loadable = False
+
+                # Does this item's name match the target device?
+                # Ableton devices can be loadable non-folders that also have
+                # preset children (e.g. "Analog" is loadable + has sub-folders).
+                name_matches = device_lower and device_lower in item.name.lower()
+
+                # Collect loadable non-folder items once inside the device's
+                # subtree — but NOT the device itself (that's the default patch).
+                if loadable and not is_folder and in_device_subtree:
+                    results.append(item.name)
+
+                # Pass True to children when the current item matched or we're
+                # already inside the subtree.
+                child_in_subtree = in_device_subtree or name_matches
+
+                if depth < 5:
+                    for child in _iter_children(item):
+                        walk(child, child_in_subtree, depth + 1)
+
+            walk(category)
+            return tuple(results[:100])  # cap to keep response size reasonable
+
+        self.osc_server.add_handler("/live/browser/get/presets", browser_get_presets)

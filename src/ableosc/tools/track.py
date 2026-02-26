@@ -18,7 +18,22 @@ async def get_tracks(client: "OscClient") -> dict[str, Any]:
     num_tracks = num_result[0]
     names = list(names_result)  # flat tuple of track names
 
-    tracks = [{"index": i, "name": names[i] if i < len(names) else "?"} for i in range(num_tracks)]
+    midi_results = (
+        await asyncio.gather(*[
+            client.get("/live/track/get/has_midi_input", i)
+            for i in range(num_tracks)
+        ])
+        if num_tracks > 0 else []
+    )
+
+    tracks = [
+        {
+            "index": i,
+            "name": names[i] if i < len(names) else "?",
+            "is_midi": bool(_scalar(midi_results[i])) if i < len(midi_results) else False,
+        }
+        for i in range(num_tracks)
+    ]
     return {"tracks": tracks, "count": num_tracks}
 
 
@@ -32,6 +47,7 @@ async def get_track(client: "OscClient", track_index: int) -> dict[str, Any]:
         solo,
         arm,
         can_be_armed,
+        is_midi,
         num_devices,
         device_names,
         clip_names,
@@ -43,6 +59,7 @@ async def get_track(client: "OscClient", track_index: int) -> dict[str, Any]:
         client.get("/live/track/get/solo", track_index),
         client.get("/live/track/get/arm", track_index),
         client.get("/live/track/get/can_be_armed", track_index),
+        client.get("/live/track/get/has_midi_input", track_index),
         client.get("/live/track/get/num_devices", track_index),
         client.get("/live/track/get/devices/name", track_index),
         client.get("/live/track/get/clips/name", track_index),
@@ -67,6 +84,7 @@ async def get_track(client: "OscClient", track_index: int) -> dict[str, Any]:
         "solo": bool(_scalar(solo)),
         "arm": bool(_scalar(arm)),
         "can_be_armed": bool(_scalar(can_be_armed)),
+        "is_midi": bool(_scalar(is_midi)),
         "devices": device_list,
         "num_devices": _scalar(num_devices),
         "clips": clips,
@@ -135,16 +153,26 @@ async def set_track_send(
     return {"status": "ok", "track_index": track_index, "send_index": send_index, "value": value}
 
 
-async def create_midi_track(client: "OscClient") -> dict[str, str]:
-    """Create a new MIDI track at the end of the session."""
+async def create_midi_track(client: "OscClient") -> dict[str, Any]:
+    """Create a new MIDI track at the end of the session.
+
+    Returns the index of the newly created track.
+    """
     client.send("/live/song/create_midi_track")
-    return {"status": "ok", "type": "midi"}
+    # AbletonOSC processes messages sequentially, so querying num_tracks
+    # immediately after the create sees the updated count.
+    num_after = (await client.get("/live/song/get/num_tracks"))[0]
+    return {"status": "ok", "type": "midi", "track_index": num_after - 1}
 
 
-async def create_audio_track(client: "OscClient") -> dict[str, str]:
-    """Create a new audio track at the end of the session."""
+async def create_audio_track(client: "OscClient") -> dict[str, Any]:
+    """Create a new audio track at the end of the session.
+
+    Returns the index of the newly created track.
+    """
     client.send("/live/song/create_audio_track")
-    return {"status": "ok", "type": "audio"}
+    num_after = (await client.get("/live/song/get/num_tracks"))[0]
+    return {"status": "ok", "type": "audio", "track_index": num_after - 1}
 
 
 async def create_return_track(client: "OscClient") -> dict[str, str]:

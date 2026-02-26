@@ -19,10 +19,43 @@ NoteDict = dict[str, Any]
 _NOTE_FIELDS = ("pitch", "start_time", "duration", "velocity", "mute")
 
 
+async def has_clip(
+    client: "OscClient", track_index: int, clip_index: int
+) -> bool:
+    """Return True if the clip slot contains a clip."""
+    result = await client.get("/live/clip_slot/get/has_clip", track_index, clip_index)
+    return bool(result[-1])
+
+
+async def get_clip_slots(
+    client: "OscClient", track_index: int
+) -> dict[str, Any]:
+    """Return occupancy status for every clip slot on a track.
+
+    Queries all scene slots in parallel and returns a list of
+    {"slot_index": N, "has_clip": bool} dicts — one per scene.
+    Use this before creating clips to avoid overwriting existing content.
+    """
+    num_scenes = (await client.get("/live/song/get/num_scenes"))[0]
+    results = await asyncio.gather(*[
+        client.get("/live/clip_slot/get/has_clip", track_index, i)
+        for i in range(num_scenes)
+    ])
+    slots = [{"slot_index": i, "has_clip": bool(r[-1])} for i, r in enumerate(results)]
+    return {"track_index": track_index, "slots": slots, "count": num_scenes}
+
+
 async def get_clip_info(
     client: "OscClient", track_index: int, clip_index: int
 ) -> dict[str, Any]:
-    """Get metadata for a clip."""
+    """Get metadata for a clip.
+
+    Returns {"has_clip": False} if the slot is empty rather than raising an error.
+    """
+    occupied = await has_clip(client, track_index, clip_index)
+    if not occupied:
+        return {"track_index": track_index, "clip_index": clip_index, "has_clip": False}
+
     (
         name,
         length,
@@ -41,6 +74,7 @@ async def get_clip_info(
         client.get("/live/clip/get/color", track_index, clip_index),
     )
     return {
+        "has_clip": True,
         "track_index": track_index,
         "clip_index": clip_index,
         "name": _scalar(name),

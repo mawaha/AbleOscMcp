@@ -250,8 +250,17 @@ def create_server(client: OscClient, rack_client: OscClient | None = None) -> Fa
 
     @mcp.tool()
     async def get_clip_info(track_index: int, clip_index: int) -> dict[str, Any]:
-        """Get metadata for a clip: name, length, loop settings, playing state."""
+        """Get metadata for a clip: name, length, loop settings, playing state.
+        Returns {"has_clip": false} if the slot is empty."""
         return await clip_tools.get_clip_info(client, track_index, clip_index)
+
+    @mcp.tool()
+    async def get_clip_slots(track_index: int) -> dict[str, Any]:
+        """Return occupancy status for every clip slot on a track.
+
+        Returns a list of {"slot_index": N, "has_clip": bool} entries — one per scene.
+        Use this before creating clips to avoid overwriting existing content."""
+        return await clip_tools.get_clip_slots(client, track_index)
 
     @mcp.tool()
     async def create_clip(
@@ -769,6 +778,18 @@ def create_server(client: OscClient, rack_client: OscClient | None = None) -> Fa
         # ------------------------------------------------------------------
         # Browser tools (requires AbleOscRack Remote Script)
         # ------------------------------------------------------------------
+
+        @mcp.tool()
+        async def list_presets(category_name: str, device_name: str) -> dict[str, Any]:
+            """List available presets for a device in the Ableton browser.
+
+            Searches the device's preset folder and returns all loadable preset names.
+
+            category_name: e.g. "instruments", "audio_effects"
+            device_name: e.g. "Analog", "Auto Filter", "Wavetable"
+
+            Requires AbleOscRack Remote Script installed in Ableton Live."""
+            return await browser_tools.list_presets(rack_client, category_name, device_name)
 
         @mcp.tool()
         async def list_browser_categories() -> dict[str, Any]:

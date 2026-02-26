@@ -21,6 +21,19 @@ async def list_browser_devices(client, category_name: str) -> dict[str, Any]:
     return {"category": category_name, "devices": list(args)}
 
 
+async def list_presets(client, category_name: str, device_name: str) -> dict[str, Any]:
+    """List the presets available for a specific device.
+
+    Searches the named device's folder in the browser and returns all loadable
+    preset names (.adv files, factory presets, etc.).
+
+    category_name: e.g. "instruments", "audio_effects"
+    device_name: e.g. "Analog", "Auto Filter"
+    """
+    args = await client.get("/live/browser/get/presets", category_name, device_name)
+    return {"category": category_name, "device": device_name, "presets": list(args)}
+
+
 async def load_device(
     client, track_index: int, category_name: str, device_name: str
 ) -> dict[str, Any]:

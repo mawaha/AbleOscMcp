@@ -252,5 +252,6 @@ def setup_default_session(mock: MockOscClient) -> None:
     mock.when_get("/live/song/get/num_tracks", 3)
     mock.when_get("/live/song/get/num_scenes", 4)
     mock.when_get("/live/song/get/track_names", "Drums", "Bass", "Lead")
+    mock.when_get("/live/track/get/has_midi_input", 0, 1)  # all tracks MIDI by default
     mock.when_get("/live/song/get/scenes/name", "Intro", "Verse", "Chorus", "Outro")
     mock.when_get("/live/song/get/cue_points")  # empty

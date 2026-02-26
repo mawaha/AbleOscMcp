@@ -19,6 +19,7 @@ def _setup_track(mock: MockOscClient, track_index: int = 0) -> None:
     mock.when_get("/live/track/get/solo", track_index, 0)
     mock.when_get("/live/track/get/arm", track_index, 1)
     mock.when_get("/live/track/get/can_be_armed", track_index, 1)
+    mock.when_get("/live/track/get/has_midi_input", track_index, 1)
     mock.when_get("/live/track/get/num_devices", track_index, 1)
     mock.when_get("/live/track/get/devices/name", track_index, "Drum Rack")
     mock.when_get("/live/track/get/clips/name", track_index, "Beat Loop", None, None, None)
@@ -81,9 +82,10 @@ async def test_session_state_includes_tracks_list(mock_client: MockOscClient):
 
     assert "tracks" in result
     assert len(result["tracks"]) == 3
-    assert result["tracks"][0] == {"index": 0, "name": "Drums"}
-    assert result["tracks"][1] == {"index": 1, "name": "Bass"}
-    assert result["tracks"][2] == {"index": 2, "name": "Lead"}
+    assert result["tracks"][0]["index"] == 0
+    assert result["tracks"][0]["name"] == "Drums"
+    assert result["tracks"][1]["name"] == "Bass"
+    assert result["tracks"][2]["name"] == "Lead"
 
 
 async def test_session_state_includes_loop_info(mock_client: MockOscClient):

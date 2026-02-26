@@ -24,6 +24,7 @@ def _setup_track(mock: MockOscClient, track_index: int = 0) -> None:
     mock.when_get("/live/track/get/solo", track_index, 0)
     mock.when_get("/live/track/get/arm", track_index, 1)
     mock.when_get("/live/track/get/can_be_armed", track_index, 1)
+    mock.when_get("/live/track/get/has_midi_input", track_index, 1)
     mock.when_get("/live/track/get/num_devices", track_index, 1)
     mock.when_get("/live/track/get/devices/name", track_index, "Drum Rack")
     mock.when_get("/live/track/get/clips/name", track_index, "Beat Loop", None, None, None)
@@ -40,9 +41,18 @@ async def test_get_tracks_returns_all_tracks(mock_client: MockOscClient):
 
     assert result["count"] == 3
     assert len(result["tracks"]) == 3
-    assert result["tracks"][0] == {"index": 0, "name": "Drums"}
-    assert result["tracks"][1] == {"index": 1, "name": "Bass"}
-    assert result["tracks"][2] == {"index": 2, "name": "Lead"}
+    assert result["tracks"][0]["index"] == 0
+    assert result["tracks"][0]["name"] == "Drums"
+    assert result["tracks"][1]["name"] == "Bass"
+    assert result["tracks"][2]["name"] == "Lead"
+
+
+async def test_get_tracks_includes_is_midi(mock_client: MockOscClient):
+    setup_default_session(mock_client)
+    result = await track_tools.get_tracks(mock_client)
+    for t in result["tracks"]:
+        assert "is_midi" in t
+    assert result["tracks"][0]["is_midi"] is True  # mock returns 1 for all tracks
 
 
 async def test_get_tracks_empty_session(mock_client: MockOscClient):
@@ -70,6 +80,7 @@ async def test_get_track_returns_full_detail(mock_client: MockOscClient):
     assert result["solo"] is False
     assert result["arm"] is True
     assert result["can_be_armed"] is True
+    assert result["is_midi"] is True
     assert result["devices"] == ["Drum Rack"]
     assert result["num_devices"] == 1
 
@@ -191,14 +202,18 @@ async def test_set_track_name(mock_client: MockOscClient):
 
 
 async def test_create_midi_track(mock_client: MockOscClient):
+    mock_client.when_get("/live/song/get/num_tracks", 4)  # 4 tracks after create
     result = await track_tools.create_midi_track(mock_client)
     assert result["type"] == "midi"
+    assert result["track_index"] == 3  # 4 - 1
     mock_client.assert_sent("/live/song/create_midi_track")
 
 
 async def test_create_audio_track(mock_client: MockOscClient):
+    mock_client.when_get("/live/song/get/num_tracks", 5)
     result = await track_tools.create_audio_track(mock_client)
     assert result["type"] == "audio"
+    assert result["track_index"] == 4  # 5 - 1
     mock_client.assert_sent("/live/song/create_audio_track")
 
 

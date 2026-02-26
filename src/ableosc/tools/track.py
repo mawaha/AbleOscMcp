@@ -18,19 +18,26 @@ async def get_tracks(client: "OscClient") -> dict[str, Any]:
     num_tracks = num_result[0]
     names = list(names_result)  # flat tuple of track names
 
-    midi_results = (
-        await asyncio.gather(*[
-            client.get("/live/track/get/has_midi_input", i)
-            for i in range(num_tracks)
-        ])
-        if num_tracks > 0 else []
+    if num_tracks == 0:
+        return {"tracks": [], "count": 0}
+
+    midi_r, vol_r, pan_r, mute_r, solo_r = await asyncio.gather(
+        asyncio.gather(*[client.get("/live/track/get/has_midi_input", i) for i in range(num_tracks)]),
+        asyncio.gather(*[client.get("/live/track/get/volume", i) for i in range(num_tracks)]),
+        asyncio.gather(*[client.get("/live/track/get/panning", i) for i in range(num_tracks)]),
+        asyncio.gather(*[client.get("/live/track/get/mute", i) for i in range(num_tracks)]),
+        asyncio.gather(*[client.get("/live/track/get/solo", i) for i in range(num_tracks)]),
     )
 
     tracks = [
         {
             "index": i,
             "name": names[i] if i < len(names) else "?",
-            "is_midi": bool(_scalar(midi_results[i])) if i < len(midi_results) else False,
+            "is_midi": bool(_scalar(midi_r[i])),
+            "volume": _scalar(vol_r[i]),
+            "pan": _scalar(pan_r[i]),
+            "mute": bool(_scalar(mute_r[i])),
+            "solo": bool(_scalar(solo_r[i])),
         }
         for i in range(num_tracks)
     ]

@@ -55,6 +55,20 @@ async def test_get_tracks_includes_is_midi(mock_client: MockOscClient):
     assert result["tracks"][0]["is_midi"] is True  # mock returns 1 for all tracks
 
 
+async def test_get_tracks_includes_mix_fields(mock_client: MockOscClient):
+    setup_default_session(mock_client)
+    result = await track_tools.get_tracks(mock_client)
+    t = result["tracks"][0]
+    assert "volume" in t
+    assert "pan" in t
+    assert "mute" in t
+    assert "solo" in t
+    assert t["volume"] == pytest.approx(0.85)
+    assert t["pan"] == pytest.approx(0.0)
+    assert t["mute"] is False
+    assert t["solo"] is False
+
+
 async def test_get_tracks_empty_session(mock_client: MockOscClient):
     mock_client.when_get("/live/song/get/num_tracks", 0)
     mock_client.when_get("/live/song/get/track_names")  # empty

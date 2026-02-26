@@ -162,6 +162,15 @@ def create_server(client: OscClient, rack_client: OscClient | None = None) -> Fa
         """Toggle session record mode."""
         return await song_tools.trigger_session_record(client)
 
+    @mcp.tool()
+    async def save_project() -> dict[str, Any]:
+        """Save the current Ableton project to disk (macOS).
+
+        Sends Cmd+S to Ableton Live via system automation. If a Save dialog
+        appears (new project), you will need to confirm the filename.
+        """
+        return await song_tools.save_project()
+
     # ------------------------------------------------------------------
     # Track tools
     # ------------------------------------------------------------------

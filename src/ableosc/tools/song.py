@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import subprocess
+import sys
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -135,3 +137,24 @@ async def trigger_session_record(client: "OscClient") -> dict[str, str]:
     """Toggle session record."""
     client.send("/live/song/trigger_session_record")
     return {"status": "ok"}
+
+
+async def save_project() -> dict[str, Any]:
+    """Save the current Ableton project (macOS only).
+
+    The Live Python API does not expose save to Remote Scripts, so this uses
+    system automation (osascript) to send Cmd+S to Ableton Live.
+    """
+    if sys.platform != "darwin":
+        return {"saved": False, "error": "save_project is only supported on macOS"}
+    script = (
+        'tell application "Ableton Live 11 Suite" to activate\n'
+        'delay 0.3\n'
+        'tell application "System Events"\n'
+        '    keystroke "s" using command down\n'
+        'end tell\n'
+    )
+    result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
+    if result.returncode != 0:
+        return {"saved": False, "error": result.stderr.strip()}
+    return {"saved": True}

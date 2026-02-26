@@ -15,10 +15,27 @@ async def list_browser_categories(client) -> dict[str, Any]:
     return {"categories": list(args)}
 
 
+def _device_type(name: str) -> str:
+    """Infer device type from the browser item name/extension."""
+    if name.endswith(".adg"):
+        return "rack_preset"   # Ableton Device Group (Instrument/Effect Rack preset)
+    if name.endswith(".adv"):
+        return "preset"        # Native device preset (e.g. "Mellow Bass.adv")
+    if name.endswith(".amxd"):
+        return "max_device"    # Max for Live device
+    return "device"            # Native device (e.g. "Analog", "Impulse")
+
+
 async def list_browser_devices(client, category_name: str) -> dict[str, Any]:
-    """Return the names of loadable devices in a browser category."""
+    """Return loadable devices in a browser category with type hints.
+
+    Each device is a dict with:
+      name — display name (may include file extension for presets)
+      type — one of: "device", "preset", "rack_preset", "max_device"
+    """
     args = await client.get("/live/browser/get/devices", category_name)
-    return {"category": category_name, "devices": list(args)}
+    devices = [{"name": name, "type": _device_type(name)} for name in args]
+    return {"category": category_name, "devices": devices}
 
 
 async def list_presets(client, category_name: str, device_name: str) -> dict[str, Any]:

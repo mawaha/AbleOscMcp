@@ -198,3 +198,26 @@ async def test_trigger_session_record(mock_client: MockOscClient):
     result = await song_tools.trigger_session_record(mock_client)
     assert result["status"] == "ok"
     mock_client.assert_sent("/live/song/trigger_session_record")
+
+
+async def test_save_project_returns_saved_true(monkeypatch):
+    import subprocess
+    import sys
+
+    monkeypatch.setattr(sys, "platform", "darwin")
+
+    class FakeResult:
+        returncode = 0
+        stderr = ""
+
+    monkeypatch.setattr(subprocess, "run", lambda *a, **kw: FakeResult())
+    result = await song_tools.save_project()
+    assert result["saved"] is True
+
+
+async def test_save_project_unsupported_platform(monkeypatch):
+    import sys
+    monkeypatch.setattr(sys, "platform", "win32")
+    result = await song_tools.save_project()
+    assert result["saved"] is False
+    assert "error" in result

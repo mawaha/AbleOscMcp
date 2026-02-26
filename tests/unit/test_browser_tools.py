@@ -63,7 +63,25 @@ async def test_list_browser_devices_returns_category_and_devices():
     mock.when_get("/live/browser/get/devices", "Analog", "Wavetable", "Operator")
     result = await browser_tools.list_browser_devices(mock, "instruments")
     assert result["category"] == "instruments"
-    assert result["devices"] == ["Analog", "Wavetable", "Operator"]
+    assert [d["name"] for d in result["devices"]] == ["Analog", "Wavetable", "Operator"]
+
+
+@pytest.mark.asyncio
+async def test_list_browser_devices_includes_type():
+    mock = MockOscClient()
+    mock.when_get(
+        "/live/browser/get/devices",
+        "Analog",                  # native device
+        "Impulse 808.adv",         # native preset
+        "Wicked Chillin.adg",      # rack preset
+        "my_device.amxd",          # max device
+    )
+    result = await browser_tools.list_browser_devices(mock, "instruments")
+    types = {d["name"]: d["type"] for d in result["devices"]}
+    assert types["Analog"] == "device"
+    assert types["Impulse 808.adv"] == "preset"
+    assert types["Wicked Chillin.adg"] == "rack_preset"
+    assert types["my_device.amxd"] == "max_device"
 
 
 @pytest.mark.asyncio
@@ -83,6 +101,8 @@ async def test_list_browser_devices_empty_category():
     mock.when_get("/live/browser/get/devices")  # empty response
     result = await browser_tools.list_browser_devices(mock, "drums")
     assert result["devices"] == []
+
+
 
 
 # ---------------------------------------------------------------------------

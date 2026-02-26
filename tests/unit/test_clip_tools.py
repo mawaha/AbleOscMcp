@@ -286,6 +286,21 @@ async def test_remove_notes_partial_range_uses_defaults(mock_client: MockOscClie
     assert len(args) == 6
 
 
+async def test_remove_notes_coerces_pitch_to_int(mock_client: MockOscClient):
+    """Pitch args must be sent as int — AbletonOSC's C++ side rejects floats."""
+    await clip_tools.remove_notes(
+        mock_client, 0, 0,
+        pitch_start=36.0, pitch_span=1.0,  # floats (mistake-prone)
+        time_start=0.0, time_span=16.0,
+    )
+    sent = [s for s in mock_client.sends if s[0] == "/live/clip/remove/notes"][0]
+    args = sent[1]
+    assert isinstance(args[2], int), "pitch_start must be int"
+    assert isinstance(args[3], int), "pitch_span must be int"
+    assert args[2] == 36
+    assert args[3] == 1
+
+
 # ---------------------------------------------------------------------------
 # duplicate_clip_loop
 # ---------------------------------------------------------------------------

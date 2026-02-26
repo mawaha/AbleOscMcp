@@ -231,3 +231,8 @@ class BrowserHandler(AbletonOSCHandler):
             return tuple(results[:100])  # cap to keep response size reasonable
 
         self.osc_server.add_handler("/live/browser/get/presets", browser_get_presets)
+
+        # ----------------------------------------------------------------
+        # /live/song/save — save the current project
+        # ----------------------------------------------------------------
+

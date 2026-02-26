@@ -218,10 +218,10 @@ async def remove_notes(
     if all(v is None for v in (pitch_start, pitch_span, time_start, time_span)):
         client.send("/live/clip/remove/notes", track_index, clip_index)
     else:
-        p_start = pitch_start if pitch_start is not None else 0
-        p_span = pitch_span if pitch_span is not None else 128
-        t_start = time_start if time_start is not None else 0.0
-        t_span = time_span if time_span is not None else 1_000_000.0
+        p_start = int(pitch_start) if pitch_start is not None else 0
+        p_span = int(pitch_span) if pitch_span is not None else 128
+        t_start = float(time_start) if time_start is not None else 0.0
+        t_span = float(time_span) if time_span is not None else 1_000_000.0
         client.send(
             "/live/clip/remove/notes",
             track_index,

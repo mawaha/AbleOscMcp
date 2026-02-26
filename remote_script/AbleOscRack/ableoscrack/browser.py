@@ -121,10 +121,17 @@ class BrowserHandler(AbletonOSCHandler):
             """Return names of directly loadable items in a browser category."""
             category_name = str(params[0]) if params else "instruments"
             browser = _browser()
+            # Set filter_type first — activates the category in Ableton's browser
+            # and forces lazy children to be populated.
+            filter_type = _FILTER_TYPES.get(category_name)
+            if filter_type is not None:
+                browser.filter_type = filter_type
             category = _get_category(browser, category_name)
             if category is None:
                 return ()
-            items = _collect_loadable(category, max_depth=1)
+            # max_depth=2 returns just the core native devices (e.g. "Auto Filter",
+            # "Compressor") without drilling into preset subfolders.
+            items = _collect_loadable(category, max_depth=2)
             return tuple(item.name for item in items)
 
         self.osc_server.add_handler(

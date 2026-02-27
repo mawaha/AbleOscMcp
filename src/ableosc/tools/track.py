@@ -150,6 +150,18 @@ async def set_track_name(
     return {"status": "ok", "track_index": track_index, "name": name}
 
 
+async def get_track_send(
+    client: "OscClient", track_index: int, send_index: int
+) -> dict[str, Any]:
+    """Get the current send level for a track return bus (0.0–1.0).
+
+    Returns index 0 for the first return track (typically Reverb A),
+    index 1 for the second (typically Delay B), etc.
+    """
+    result = await client.get("/live/track/get/send", track_index, send_index)
+    return {"track_index": track_index, "send_index": send_index, "value": result[-1]}
+
+
 async def set_track_send(
     client: "OscClient", track_index: int, send_index: int, value: float
 ) -> dict[str, Any]:

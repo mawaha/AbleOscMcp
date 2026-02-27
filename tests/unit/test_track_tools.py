@@ -160,6 +160,23 @@ async def test_set_track_pan_rejects_out_of_range(mock_client: MockOscClient):
         await track_tools.set_track_pan(mock_client, 0, 2.0)
 
 
+async def test_get_track_send(mock_client: MockOscClient):
+    mock_client.when_get("/live/track/get/send", 0, 0, 0.25)
+    result = await track_tools.get_track_send(mock_client, 0, 0)
+    assert result["track_index"] == 0
+    assert result["send_index"] == 0
+    assert result["value"] == pytest.approx(0.25)
+
+
+async def test_get_track_send_sends_correct_params(mock_client: MockOscClient):
+    mock_client.when_get("/live/track/get/send", 2, 1, 0.18)
+    await track_tools.get_track_send(mock_client, 2, 1)
+    assert any(
+        addr == "/live/track/get/send" and args == (2, 1)
+        for addr, args in mock_client.gets
+    )
+
+
 async def test_set_track_send(mock_client: MockOscClient):
     result = await track_tools.set_track_send(mock_client, 0, 0, 0.5)
     assert result["status"] == "ok"

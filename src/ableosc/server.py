@@ -217,6 +217,16 @@ def create_server(client: OscClient, rack_client: OscClient | None = None) -> Fa
         return await track_tools.set_track_name(client, track_index, name)
 
     @mcp.tool()
+    async def get_track_send(track_index: int, send_index: int) -> dict[str, Any]:
+        """Get the current send level for a track return bus.
+
+        send_index 0 = first return track (typically Reverb A),
+        send_index 1 = second (typically Delay B).
+        Returns value in range 0.0–1.0.
+        """
+        return await track_tools.get_track_send(client, track_index, send_index)
+
+    @mcp.tool()
     async def set_track_send(
         track_index: int, send_index: int, value: float
     ) -> dict[str, Any]:

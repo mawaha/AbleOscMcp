@@ -25,6 +25,7 @@ from typing import Any, AsyncIterator
 
 from mcp.server.fastmcp import FastMCP
 
+from ableosc import copilot as copilot_module
 from ableosc import resources
 from ableosc.client import OscClient
 from ableosc.device_database import DeviceDatabase
@@ -852,6 +853,40 @@ def create_server(client: OscClient, rack_client: OscClient | None = None) -> Fa
             return await browser_tools.load_device(
                 rack_client, track_index, category_name, device_name
             )
+
+    # ---------------------------------------------------------------------------
+    # Co-pilot
+    # ---------------------------------------------------------------------------
+
+    @mcp.tool()
+    async def start_copilot(duration_seconds: int = 120) -> str:
+        """Start the live co-pilot for a set duration.
+
+        Watches your Ableton session while you work: whenever you select a
+        different track or change the tempo, Claude inspects what's there and
+        responds with a brief observation and 1-2 specific suggestions.
+
+        Navigate around your session while this runs — you'll get contextual
+        feedback based on what you're actually looking at.
+
+        Args:
+            duration_seconds: How long to run in seconds (default 120 = 2 min).
+
+        Returns:
+            A formatted log of every suggestion generated during the session.
+        """
+        log = await copilot_module.run_copilot(client, registry, duration_seconds)
+
+        if not log:
+            return "Co-pilot ran but no events were detected. Try navigating between tracks."
+
+        lines = [f"Co-pilot session ({duration_seconds}s) — {len(log)} suggestion(s):\n"]
+        for i, entry in enumerate(log, 1):
+            lines.append(f"[{i}] {entry['event']}")
+            lines.append(f"    {entry['suggestion']}")
+            lines.append("")
+
+        return "\n".join(lines)
 
     return mcp
 

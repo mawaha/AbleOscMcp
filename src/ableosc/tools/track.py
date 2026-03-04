@@ -172,6 +172,74 @@ async def set_track_send(
     return {"status": "ok", "track_index": track_index, "send_index": send_index, "value": value}
 
 
+async def get_available_input_routing_types(
+    client: "OscClient", track_index: int
+) -> dict[str, Any]:
+    """List available input routing sources for an audio track.
+
+    Returns track names, hardware inputs, and special sources like 'Resampling'.
+    Only meaningful for audio tracks — MIDI tracks return MIDI sources.
+    """
+    result = await client.get(
+        "/live/track/get/available_input_routing_types", track_index
+    )
+    # Response: (track_index, type1, type2, ...) — skip first element
+    types = list(result[1:])
+    return {"track_index": track_index, "types": types}
+
+
+async def set_input_routing_type(
+    client: "OscClient", track_index: int, routing_type: str
+) -> dict[str, Any]:
+    """Set the input routing source for a track.
+
+    Use get_available_input_routing_types() to list valid values for this track.
+    Common values: 'All Ins', 'No Input', or a track name like 'NB Top'.
+    """
+    client.send("/live/track/set/input_routing_type", track_index, routing_type)
+    return {"status": "ok", "track_index": track_index, "input_routing_type": routing_type}
+
+
+async def setup_resample_track(
+    client: "OscClient", source_track_name: str
+) -> dict[str, Any]:
+    """Create an audio track pre-configured to capture another track's output.
+
+    Creates a new audio track, routes its input to source_track_name, names it
+    '{source_track_name} (Resampled)', and arms it for recording.
+
+    After calling this, fire clip slot 0 on the returned track_index to start
+    recording, then fire it again to commit the clip and stop.
+
+    Args:
+        source_track_name: The exact name of the source track (e.g. 'NB Top').
+                           Must match a track name visible in Ableton.
+
+    Returns:
+        dict with track_index, name, input_routing, and next_step instructions.
+    """
+    # Create audio track
+    result = await create_audio_track(client)
+    new_idx = result["track_index"]
+
+    name = f"{source_track_name} (Resampled)"
+    client.send("/live/track/set/name", new_idx, name)
+    client.send("/live/track/set/input_routing_type", new_idx, source_track_name)
+    client.send("/live/track/set/arm", new_idx, 1)
+
+    return {
+        "status": "ready",
+        "track_index": new_idx,
+        "name": name,
+        "input_routing": source_track_name,
+        "next_step": (
+            f"Track {new_idx} is armed. "
+            "Call fire_clip(track_index, 0) to start recording into slot 0, "
+            "then fire_clip(track_index, 0) again to stop and commit the clip."
+        ),
+    }
+
+
 async def create_midi_track(client: "OscClient") -> dict[str, Any]:
     """Create a new MIDI track at the end of the session.
 

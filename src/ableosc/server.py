@@ -264,6 +264,30 @@ def create_server(client: OscClient, rack_client: OscClient | None = None) -> Fa
         """Duplicate a track."""
         return await track_tools.duplicate_track(client, track_index)
 
+    @mcp.tool()
+    async def get_available_input_routing_types(track_index: int) -> dict[str, Any]:
+        """List available input sources for a track (track outputs, hardware ins, etc.).
+
+        Use this to discover valid values before calling set_input_routing_type."""
+        return await track_tools.get_available_input_routing_types(client, track_index)
+
+    @mcp.tool()
+    async def set_input_routing_type(track_index: int, routing_type: str) -> dict[str, Any]:
+        """Set the input routing source for a track (e.g. 'NB Top', 'All Ins', 'No Input')."""
+        return await track_tools.set_input_routing_type(client, track_index, routing_type)
+
+    @mcp.tool()
+    async def setup_resample_track(source_track_name: str) -> dict[str, Any]:
+        """Create and arm an audio track to resample another track.
+
+        Creates a new audio track, routes its input to source_track_name, names it
+        '{source_track_name} (Resampled)', and arms it ready to record.
+
+        After calling this, use fire_clip(track_index, 0) to start recording,
+        then fire_clip(track_index, 0) again to stop and commit the clip.
+        """
+        return await track_tools.setup_resample_track(client, source_track_name)
+
     # ------------------------------------------------------------------
     # Clip tools
     # ------------------------------------------------------------------
@@ -875,18 +899,14 @@ def create_server(client: OscClient, rack_client: OscClient | None = None) -> Fa
         Returns:
             A formatted log of every suggestion generated during the session.
         """
-        log = await copilot_module.run_copilot(client, registry, duration_seconds)
+        result = await copilot_module.run_copilot(client, registry, duration_seconds)
 
-        if not log:
+        events = result.get("events", [])
+        if not events:
             return "Co-pilot ran but no events were detected. Try navigating between tracks."
 
-        lines = [f"Co-pilot session ({duration_seconds}s) — {len(log)} suggestion(s):\n"]
-        for i, entry in enumerate(log, 1):
-            lines.append(f"[{i}] {entry['event']}")
-            lines.append(f"    {entry['suggestion']}")
-            lines.append("")
-
-        return "\n".join(lines)
+        import json as _json
+        return _json.dumps(result, indent=2)
 
     return mcp
 
